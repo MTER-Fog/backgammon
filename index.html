@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تخته نرد آنلاین</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d47a1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { font-family: Tahoma, Arial, sans-serif; background: #0d47a1; color: #fff; margin: 0; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; height: 100vh; }
+        
+        #lobby { margin-top: 50px; background: rgba(0,0,0,0.4); padding: 30px; border-radius: 15px; border: 2px solid #64b5f6; }
+        #lobby h2 { margin-top: 0; color: #fff; }
+        input { padding: 10px; font-size: 18px; width: 150px; text-align: center; border-radius: 5px; border: none; background: #fff; color: #000; }
+        button { padding: 12px 25px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-family: Tahoma; font-weight: bold; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        .btn-green { background: #4CAF50; color: white; }
+        .btn-red { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: black; }
+        .btn-end-turn { background: #9c27b0; color: white; font-size: 18px; padding: 15px 30px; border: 3px solid #fff; display: none; animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0.7; } }
+        
+        #game-container { display: none; max-width: 650px; width: 100%; height: 100%; flex-direction: column; justify-content: space-between; }
+        #status { color: #fff; margin: 5px 0; font-size: 15px; min-height: 30px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; display: flex; justify-content: center; align-items: center; }
+        
+        .board { display: flex; flex-direction: column; background: #5d4037; border: 8px solid #3e2723; border-radius: 10px; padding: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); flex-grow: 1; }
+        .row { display: flex; height: 42%; }
+        .cell { flex: 1; background: #d7ccc8; border: 1px solid #8d6e63; position: relative; cursor: pointer; margin: 1px; }
+        .cell.dark { background: #8d6e63; }
+        .cell.sel { background: #ffeb3b !important; }
+        .cell-num { position: absolute; font-size: 9px; color: rgba(0,0,0,0.4); z-index: 5; }
+        .row.top .cell-num { bottom: 2px; }
+        .row.bottom .cell-num { top: 2px; }
+        
+        .piece { width: 28px; height: 28px; border-radius: 50%; position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 2px solid #555; box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3), 1px 2px 4px rgba(0,0,0,0.6); }
+        .piece.white { background: radial-gradient(circle at 30% 30%, #fff, #ccc); color: #333; border-color: #bbb; }
+        .piece.black { background: radial-gradient(circle at 30% 30%, #555, #111); color: #fff; border-color: #000; }
+        
+        .middle { background: #3e2723; padding: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; height: 16%; border-top: 2px solid #4e342e; border-bottom: 2px solid #4e342e; }
+        .bar-area { cursor: pointer; padding: 5px 10px; border-radius: 5px; color: #fff; font-size: 12px; }
+        .bar-area.active { background: #ff5722; animation: pulse 0.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        .controls { margin: 10px 0; display: flex; justify-content: center; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; min-height: 70px; }
+        .die { display: inline-block; background: #fff; color: #000; width: 50px; height: 50px; line-height: 50px; font-size: 26px; font-weight: bold; border-radius: 10px; box-shadow: 3px 3px 0 #000; }
+        .die.used { opacity: 0.3; text-decoration: line-through; }
+        
+        .off-btn { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); background: #4CAF50; color: white; border: 2px solid #fff; width: 30px; height: 60px; writing-mode: vertical-rl; text-orientation: mixed; border-radius: 5px; cursor: pointer; font-size: 10px; display: none; font-weight: bold; }
+        #top-row .off-btn { left: auto; right: -40px; }
+    </style>
+</head>
+<body>
+
+    <div id="lobby">
+        <h2>🎲 تخته نرد آنلاین</h2>
+        <div style="margin: 20px 0;">
+            <button class="btn-green" onclick="createRoom()">ساخت پارتی جدید</button>
+        </div>
+        <hr style="border-color: #64b5f6; width: 80%; margin: 20px auto;">
+        <div>
+            <h3>ورود به پارتی</h3>
+            <input type="number" id="roomCode" placeholder="کد پارتی">
+            <button class="btn-warning" onclick="joinRoom()">ورود</button>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="status">در حال بارگذاری...</div>
+        
+        <div class="board">
+            <div class="row top" id="top-row">
+                <button class="off-btn" id="off-w" onclick="moveOff('white')">خروج</button>
+            </div>
+            <div class="middle">
+                <div class="bar-area" id="bar-black" onclick="selectBar('black')">مشکی میله: <b id="bar-b-count">0</b></div>
+                <button class="btn-red" id="roll-btn" onclick="rollDice()" disabled>پرتاب طاس</button>
+                <div class="bar-area" id="bar-white" onclick="selectBar('white')">سفید میله: <b id="bar-w-count">0</b></div>
+            </div>
+            <div class="row bottom" id="bot-row">
+                <button class="off-btn" id="off-b" onclick="moveOff('black')">خروج</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <span class="die" id="d1">-</span>
+            <span class="die" id="d2">-</span>
+        </div>
+        
+        <button class="btn-end-turn" id="end-turn-btn" onclick="endTurn()">⚠️ پایان نوبت</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        let myRoom = '', myColor = '', turn = '', board = [], bar = {white: 0, black: 0}, off = {white: 0, black: 0};
+        let diceLeft = [], selectedFrom = null, gameStarted = false;
+
+        function createRoom() { socket.emit('create_room'); }
+        function joinRoom() { const code = document.getElementById('roomCode').value; if(code) socket.emit('join_room', {room: code}); }
+
+        socket.on('room_created', (data) => {
+            myRoom = data.room; myColor = data.color;
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            document.getElementById('status').innerText = `کد پارتی: ${myRoom} (منتظر حریف...)`;
+        });
+
+        socket.on('room_joined', (data) => { 
+            myRoom = document.getElementById('roomCode').value; 
+            myColor = data.color; 
+        });
+
+        socket.on('error', (data) => { alert(data.msg); });
+
+        socket.on('game_start', (data) => {
+            board = data.board; turn = data.turn; bar = data.bar; off = data.off;
+            gameStarted = false;
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            
+            document.getElementById('roll-btn').style.display = 'block';
+            document.getElementById('roll-btn').innerText = 'طاس شروع';
+            document.getElementById('roll-btn').disabled = false;
+            document.getElementById('end-turn-btn').style.display = 'none';
+            document.getElementById('d1').innerText = '-';
+            document.getElementById('d2').innerText = '-';
+            document.getElementById('status').innerText = "برای تعیین نوبت، هر دو بازیکن طاس بیندازند";
+            renderBoard();
+        });
+
+        // سیستم طاس شروع
+        socket.on('first_rolled', (data) => {
+            if (data.color === 'white') document.getElementById('d1').innerText = data.die;
+            else document.getElementById('d2').innerText = data.die;
+            
+            if (data.color === myColor) {
+                document.getElementById('roll-btn').disabled = true;
+                document.getElementById('status').innerText = `تو ${data.die} آوردی، منتظر حریف...`;
+            } else {
+                document.getElementById('status').innerText = `حریف ${data.die} آورد. حالا تو بزن!`;
+                document.getElementById('roll-btn').disabled = false;
+            }
+        });
+
+        socket.on('first_tie', () => {
+            document.getElementById('d1').innerText = '-';
+            document.getElementById('d2').innerText = '-';
+            document.getElementById('roll-btn').disabled = false;
+            document.getElementById('status').innerText = "هر دو مساوی آوردید! دوباره تاس بزنید.";
+        });
+
+        socket.on('first_decided', (data) => {
+            gameStarted = true;
+            turn = data.winner;
+            document.getElementById('d1').innerText = data.dice[0];
+            document.getElementById('d2').innerText = data.dice[1];
+            document.getElementById('roll-btn').innerText = 'پرتاب طاس';
+            document.getElementById('roll-btn').disabled = true;
+            
+            if (turn === myColor) {
+                diceLeft = data.dice;
+                document.getElementById('status').innerText = "🎉 عدد بالاتر را آوردی! شروعت کن.";
+            } else {
+                diceLeft = [];
+                document.getElementById('status').innerText = "حریف عدد بالاتر را آورد، نوبت اوست...";
+            }
+            renderBoard();
+        });
+
+        socket.on('game_over', (data) => { alert(data.winner === myColor ? 'شما برنده شدید! 🎉' : 'حریف برنده شد! 💔'); location.reload(); });
+
+        for(let i=12; i<=23; i++) createCell('top-row', i, 'top');
+        for(let i=11; i>=0; i--) createCell('bot-row', i, 'bottom');
+
+        function createCell(parentId, index, pos) {
+            const div = document.createElement('div');
+            div.className = `cell ${index%2===0 ? 'dark' : ''} ${pos}`;
+            div.id = `cell-${index}`;
+            div.innerHTML = `<span class="cell-num">${index + 1}</span>`;
+            div.onclick = () => handleCellClick(index);
+            document.getElementById(parentId).appendChild(div);
+        }
+
+        function rollDice() {
+            if (!gameStarted) {
+                socket.emit('roll_first', {room: myRoom, color: myColor});
+            } else {
+                socket.emit('roll_dice', {room: myRoom, color: myColor});
+            }
+            document.getElementById('roll-btn').disabled = true;
+        }
+
+        socket.on('dice_rolled', (data) => {
+            if (turn === myColor) {
+                diceLeft = [data.d1, data.d2];
+                document.getElementById('d1').innerText = data.d1;
+                document.getElementById('d2').innerText = data.d2;
+                document.getElementById('d1').classList.remove('used');
+                document.getElementById('d2').classList.remove('used');
+                document.getElementById('end-turn-btn').style.display = 'none';
+            }
+            updateUI();
+        });
+
+        function selectBar(color) {
+            if(turn !== myColor || color !== myColor || bar[color] <= 0) return;
+            selectedFrom = 'bar';
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('sel'));
+            document.getElementById('status').innerText = "مهره میله انتخاب شد، حالا خانه مقصد را بزن.";
+        }
+
+        function moveOff(color) {
+            if(turn !== myColor || color !== myColor || selectedFrom === null || selectedFrom === 'bar') return alert('ابتدا یک مهره را انتخاب کنید');
+            let s = selectedFrom;
+            let dist = myColor === 'white' ? (s + 1) : (24 - s);
+            
+            let dieIdx = diceLeft.indexOf(dist);
+            if(dieIdx === -1) {
+                for(let i=0; i<diceLeft.length; i++) {
+                    if(diceLeft[i] > dist && isFarthest(s)) { dieIdx = i; break; }
+                }
+            }
+            if(dieIdx === -1) return alert('تاس مناسبی برای خروج نداری');
+            
+            socket.emit('make_move', {room: myRoom, color: myColor, from: s, to: 'off', die: diceLeft[dieIdx]});
+            document.getElementById(`cell-${s}`).classList.remove('sel'); selectedFrom = null;
+        }
+
+        function isFarthest(idx) {
+            if(myColor === 'white') { for(let i=23; i>idx; i--) if(board[i]>0) return false; }
+            else { for(let i=0; i<idx; i++) if(board[i]<0) return false; }
+            return true;
+        }
+
+        function handleCellClick(index) {
+            if(turn !== myColor || diceLeft.length === 0) return;
+            
+            if(selectedFrom === null) {
+                if(bar[myColor] > 0) return alert("اول باید از روی میله وارد شوی! روی کلمه میله کلیک کن.");
+                const cellVal = board[index];
+                if((myColor === 'white' && cellVal > 0) || (myColor === 'black' && cellVal < 0)) {
+                    selectedFrom = index;
+                    document.getElementById(`cell-${index}`).classList.add('sel');
+                }
+            } else {
+                tryToMove(selectedFrom, index);
+                document.getElementById(`cell-${selectedFrom}`)?.classList.remove('sel');
+                selectedFrom = null;
+            }
+        }
+
+                   function tryToMove(from, to) {
+            let distance;
+            // محاسبه دقیق فاصله در کلاینت (همان منطق سرور)
+            if (from === 'bar') {
+                distance = myColor === 'white' ? (24 - to) : (to + 1);
+            } else {
+                const direction = myColor === 'white' ? -1 : 1;
+                distance = (to - from) * direction;
+            }
+            
+            let dieIndex = -1;
+            if(diceLeft.includes(distance)) { dieIndex = diceLeft.indexOf(distance); }
+            else if(diceLeft.length === 2 && diceLeft[0] + diceLeft[1] === distance) { dieIndex = 2; }
+            else { alert(`فاصله ${distance} با تاس‌های (${diceLeft.join(' و ')}) مطابقت ندارد`); return; }
+
+            // رفع باگ ادغام تاس: اگر ادغام است، مجموع فاصله را به سرور بفرست، نه اولین تاس را
+            let dieToSend = (dieIndex === 2) ? distance : diceLeft[dieIndex];
+
+            socket.emit('make_move', {room: myRoom, color: myColor, from: from, to: to, die: dieToSend});
+        }
+
+        socket.on('move_made', (data) => {
+            board = data.board; bar = data.bar; off = data.off;
+            
+            if (turn === myColor) {
+                if(diceLeft.length === 2) diceLeft = []; else diceLeft.splice(0, 1);
+                
+                document.getElementById('d1').classList.add('used');
+                if(diceLeft.length === 0) document.getElementById('d2').classList.add('used');
+                
+                if(diceLeft.length === 0) {
+                    document.getElementById('end-turn-btn').style.display = 'block';
+                    document.getElementById('status').innerText = "✅ تمام تاس‌ها استفاده شد. دکمه پایان نوبت را بزن.";
+                } else {
+                    document.getElementById('status').innerText = `نوبت شما (تاس باقیمانده: ${diceLeft.join(' و ')})`;
+                }
+                if(data.hit) alert("مهره حریف زده شد و به میله رفت!");
+            } else {
+                document.getElementById('status').innerText = "⏳ حریف در حال بازی...";
+            }
+            renderBoard();
+        });
+
+        function endTurn() {
+            socket.emit('end_turn', {room: myRoom});
+            document.getElementById('end-turn-btn').style.display = 'none';
+            selectedFrom = null; diceLeft = [];
+            document.getElementById('d1').innerText = '-';
+            document.getElementById('d2').innerText = '-';
+            document.getElementById('d1').classList.remove('used');
+            document.getElementById('d2').classList.remove('used');
+        }
+
+        socket.on('turn_changed', (data) => { turn = data.turn; updateUI(); });
+
+        function renderBoard() {
+            for(let i=0; i<24; i++) {
+                const cell = document.getElementById(`cell-${i}`);
+                cell.querySelectorAll('.piece').forEach(p => p.remove());
+                const count = Math.abs(board[i]);
+                if(count === 0) continue;
+                const color = board[i] > 0 ? 'white' : 'black';
+                const isTop = i >= 12;
+                let piecesToShow = Math.min(count, 5);
+                
+                for(let j=0; j<piecesToShow; j++) {
+                    const p = document.createElement('div');
+                    p.className = `piece ${color}`;
+                    if(isTop) { p.style.top = `${2 + j * 30}px`; } 
+                    else { p.style.bottom = `${2 + j * 30}px`; }
+                    if(j === 4 && count > 5) p.innerText = count; 
+                    cell.appendChild(p);
+                }
+            }
+            
+            document.getElementById('bar-w-count').innerText = bar.white;
+            document.getElementById('bar-b-count').innerText = bar.black;
+            document.getElementById('bar-white').classList.toggle('active', myColor==='white' && bar.white>0 && turn==='white');
+            document.getElementById('bar-black').classList.toggle('active', myColor==='black' && bar.black>0 && turn==='black');
+            
+            let canW = myColor==='white' && off.white<15 && bar.white===0 && board.slice(0,18).every(v=>v<=0);
+            let canB = myColor==='black' && off.black<15 && bar.black===0 && board.slice(6).every(v=>v>=0);
+            document.getElementById('off-w').style.display = (canW && turn==='white' && diceLeft.length>0) ? 'block' : 'none';
+            document.getElementById('off-b').style.display = (canB && turn==='black' && diceLeft.length>0) ? 'block' : 'none';
+        }
+
+        function updateUI() {
+            if (!gameStarted) return; // تا وقتی بازی شروع نشده، آپدیت نکن
+            
+            const isMyTurn = turn === myColor;
+            document.getElementById('roll-btn').style.display = 'block';
+            document.getElementById('roll-btn').innerText = 'پرتاب طاس';
+            document.getElementById('roll-btn').disabled = !isMyTurn || diceLeft.length > 0;
+            
+            if(isMyTurn && diceLeft.length === 0) {
+                document.getElementById('status').innerText = "🎯 نوبت شماست! دکمه پرتاب طاس را بزنید.";
+            } else if (!isMyTurn) {
+                document.getElementById('status').innerText = "⏳ نوبت حریف است... (منتظر پایان نوبت او)";
+            }
+            renderBoard();
+        }
+    </script>
+</body>
+</html>
